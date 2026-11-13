@@ -107,13 +107,18 @@ async def get_streams(request: Request, media_type: str, media_id: str):
             return {"streams": []}
         data = resp.json()
 
-    base_url = str(request.base_url).rstrip("/")
+    # Force HTTPS behind Render's proxy so Stremio doesn't drop the links
+    proto = request.headers.get("x-forwarded-proto", "https")
+    host = request.headers.get("host")
+    base_url = f"{proto}://{host}"
+    
     filtered_streams = []
 
     for item in data.get("streams", []):
         title = item.get("title", "")
         size_gb = parse_size_gb(title)
 
+        # Skip files larger than your 4 GB Seedr account limit
         if size_gb is not None and size_gb > MAX_SIZE_GB:
             continue
 
@@ -127,7 +132,9 @@ async def get_streams(request: Request, media_type: str, media_id: str):
             "name": f"Seedr Free ⚡\n{item.get('name', 'Torrentio')}",
             "title": title,
             "url": play_url,
-            "behaviorHints": {"notWebReady": False}
+            "behaviorHints": {
+                "notWebReady": False
+            }
         })
 
     return {"streams": filtered_streams}
